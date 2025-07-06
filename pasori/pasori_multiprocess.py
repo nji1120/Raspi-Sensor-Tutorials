@@ -5,7 +5,7 @@
 from __future__ import print_function
 from ctypes import *
 from copy import deepcopy
-
+import json
 from socket import socket,AF_INET,SOCK_DGRAM
 from multiprocessing import Process
 import time
@@ -17,10 +17,10 @@ sock1=socket(AF_INET,SOCK_DGRAM)
 sock2=socket(AF_INET,SOCK_DGRAM)
 sock1.bind(("",BASE_PORT))
 sock2.bind(("",BASE_PORT+1))
-msg,addr=sock1.recvfrom(65335)
-print(msg,addr)
-msg,addr=sock2.recvfrom(65335)
-print(msg,addr)
+# msg,addr=sock1.recvfrom(65335)
+# print(msg,addr)
+# msg,addr=sock2.recvfrom(65335)
+# print(msg,addr)
 
 class Pasori():
     def __init__(self,id:int):
@@ -79,7 +79,10 @@ class Pasori():
                 libpafe.free(self.felica)
 
                 #socket送信
-                msg=f"pasori_id:{self.id},felica_id:{sort_idm(idm.value)}"
+                # msg=f"pasori_id:{self.id},felica_id:{sort_idm(idm.value)}"
+                msg_dict={"pasori_id":self.id,"felica_id":sort_idm(idm.value)}
+                msg=json.dumps(msg_dict)
+                print(msg)
                 sock.sendto(msg.encode("utf-8"),(client,port))
                 print(msg)
 
@@ -206,7 +209,7 @@ if __name__ == '__main__':
         pasoris.append(Pasori(id=i))
     # pasoris.reverse()
 
-    read_and_send_felica_processing(pasoris,socks,freq=1)
+    read_and_send_felica_processing(pasoris,socks,freq=2)
        
     sock1.close()
     sock2.close()

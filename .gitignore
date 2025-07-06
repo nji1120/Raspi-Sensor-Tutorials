@@ -2,3 +2,4 @@ __pycahe__
 *.pyc
 *.png
 *.jpg
+__pycache__

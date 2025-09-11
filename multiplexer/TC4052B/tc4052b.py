@@ -58,8 +58,10 @@ class TC4052B:
     mappingテーブルを受け取って, 指定のchannelを開けるだけ
     """
 
-    def __init__(self, mapping):
+
+    def __init__(self, mapping:pd.DataFrame, index_col_id:int=0):
         """
+        :param index_col_id: インデックスの列番号. 0がデフォルト
         :param mapping: 
             columns: channel_name, gpio_pins (開けるチャンネル名とアドレス指定に使うgpioのピン番号)
             rows: ch0, LOW, HIGH, LOW, LOW,... (開けるチャンネル名と各GPIOのHIGH/LOW)
@@ -77,7 +79,11 @@ class TC4052B:
         ] 
 
         # channel切り替え用のswitchを作成
-        self.channel_switch=self.__create_channel_switch(address_pins, mapping)
+        self.channel_switch=self.__create_channel_switch(
+            address_pins=address_pins,
+            mapping=mapping,
+            index_col_id=index_col_id
+        )
 
 
 
@@ -87,7 +93,8 @@ class TC4052B:
         mappingCSVに書いていたchannel_nameを指定するだけ
         """
         try:
-            [func() for func in self.channel_switch[channel_name]]
+            # 各GPIOのHIGH/LOWを指定
+            [set_high_low() for set_high_low in self.channel_switch[channel_name]]
         except KeyError:
             raise ValueError(f"Invalid channel name: {channel_name}")
         except Exception as e:
@@ -98,7 +105,12 @@ class TC4052B:
         GPIO.cleanup()
 
 
-    def __create_channel_switch(self, address_pins:list[AddressPin], mapping:pd.DataFrame) -> dict:
+    def __create_channel_switch(
+        self, 
+        address_pins:list[AddressPin], 
+        mapping:pd.DataFrame,
+        index_col_id:int=0
+    ) -> dict:
         """
         csvのmappingから, 関数でchannel切り替えができるswitchを作成する.
         usage:
@@ -108,18 +120,25 @@ class TC4052B:
         """
         channel_switch={}
         for i, row in mapping.iterrows():
-            channel_name=row[0]
+
+            channel_name=row[index_col_id]
             high_low_arrangement=[]
-            for address_pin,key in zip(address_pins,row[1:]):
+            for address_pin,key in zip(address_pins,row[index_col_id+1:]):
+
+                # 関数のmapping
+                func_map={
+                    None: address_pin.noop,
+                    HIGH: address_pin.set_high,
+                    LOW: address_pin.set_low,
+                }
+                
                 high_low=CHECK_HIGH_LOW(key)
-                if high_low is None:
-                    high_low_arrangement.append(address_pin.noop)
-                elif high_low is HIGH:
-                    high_low_arrangement.append(address_pin.set_high)
-                elif high_low is LOW:
-                    high_low_arrangement.append(address_pin.set_low)
-                else:
-                    raise ValueError(f"Invalid high/low: {high_low}")
+                try:
+                    high_low_arrangement.append(func_map[high_low])
+                except Exception as e:
+                    raise ValueError(f"Invalid high/low: {high_low} : {e}")
+            
             channel_switch[channel_name]=high_low_arrangement
+        
         return channel_switch
 

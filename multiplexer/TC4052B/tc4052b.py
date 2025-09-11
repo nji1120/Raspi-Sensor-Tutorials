@@ -3,6 +3,30 @@ GPIO.setmode(GPIO.BCM)
 import pandas as pd
 
 
+# マッピングテーブルに入力されるであろうキーリスト
+# (※基本的にH/Lを入れるつもりではあるけど...)
+HIGH=1
+LOW=0
+KEY_LIST_HIGH=["HIGH","HI","H","ON","TRUE","T",1,True]
+KEY_LIST_LOW=["Low","LO","L","OFF","FALSE","F",0,False]
+def CHECK_HIGH_LOW(key) -> int|None:
+
+    # 何も入ってないときはNone. GPIOも何もしない
+    if key is None or key == "":
+        return None
+
+    elif type(key) in [int,bool]:
+        return key
+    elif type(key) is str:
+        if key.upper() in KEY_LIST_HIGH:
+            return HIGH
+        elif key.upper() in KEY_LIST_LOW:
+            return LOW
+        else:
+            raise ValueError(f"Invalid key: {key}")
+    else:
+        raise ValueError(f"Invalid key type: {key} : {type(key)}")
+
 class AddressPin:
     """
     GPIOのwrapperクラス
@@ -16,6 +40,13 @@ class AddressPin:
     
     def set_low(self):
         GPIO.output(self.pin, GPIO.LOW)
+
+    def noop(self):
+        """
+        何もしない(noop:no operation)
+        多段MUXで特にH/Lの指定が必要ないときに使う
+        """
+        pass
     
     def __del__(self):
         GPIO.cleanup(self.pin)
@@ -41,9 +72,54 @@ class TC4052B:
         """
 
         # gpioピン
-        # これのset_high, set_lowをlistに格納して実行するだけ
-        self.address_pins=[
+        address_pins=[
             AddressPin(pin) for pin in mapping.columns[1:]
         ] 
 
+        # channel切り替え用のswitchを作成
+        self.channel_switch=self.__create_channel_switch(address_pins, mapping)
+
+
+
+    def switch_channel(self, channel_name:str) -> None:
+        """
+        channel切り替え関数.
+        mappingCSVに書いていたchannel_nameを指定するだけ
+        """
+        try:
+            [func() for func in self.channel_switch[channel_name]]
+        except KeyError:
+            raise ValueError(f"Invalid channel name: {channel_name}")
+        except Exception as e:
+            raise ValueError(f"Error switching channel: {e}")
+
+
+    def __del__(self):
+        GPIO.cleanup()
+
+
+    def __create_channel_switch(self, address_pins:list[AddressPin], mapping:pd.DataFrame) -> dict:
+        """
+        csvのmappingから, 関数でchannel切り替えができるswitchを作成する.
+        usage:
+            # ch0を開ける. こんな感じで対応するchannelをdictのキーで指定して, 中の関数を実行すれば良い 
+            [func() for func in channel_switch["ch0"]] 
+            ...
+        """
+        channel_switch={}
+        for i, row in mapping.iterrows():
+            channel_name=row[0]
+            high_low_arrangement=[]
+            for address_pin,key in zip(address_pins,row[1:]):
+                high_low=CHECK_HIGH_LOW(key)
+                if high_low is None:
+                    high_low_arrangement.append(address_pin.noop)
+                elif high_low is HIGH:
+                    high_low_arrangement.append(address_pin.set_high)
+                elif high_low is LOW:
+                    high_low_arrangement.append(address_pin.set_low)
+                else:
+                    raise ValueError(f"Invalid high/low: {high_low}")
+            channel_switch[channel_name]=high_low_arrangement
+        return channel_switch
 

@@ -58,6 +58,7 @@ class TC4052B:
     mappingテーブルを受け取って, 指定のchannelを開けるだけ
     """
 
+
     def __init__(self, mapping:pd.DataFrame, index_col_id:int=0):
         """
         :param index_col_id: インデックスの列番号. 0がデフォルト
@@ -119,6 +120,7 @@ class TC4052B:
         """
         channel_switch={}
         for i, row in mapping.iterrows():
+
             channel_name=row[index_col_id]
             high_low_arrangement=[]
             for address_pin,key in zip(address_pins,row[index_col_id+1:]):

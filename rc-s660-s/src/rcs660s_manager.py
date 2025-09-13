@@ -58,7 +58,9 @@ class RCS660SManager:
         rcs660s.create_command_frame(
             ccid_command=TransparentExchange(
                 # 0bit目, 1bit目はFalse必須
-                data_object_tag=TransparentExchangeDataObjectTag.TRANSMISSION_RECEPTION_FLAG(False,False,True,True)
+                data_object_tag=TransparentExchangeDataObjectTag.TRANSMISSION_RECEPTION_FLAG(
+                    False,False,True,True
+                )
             ), is_debug=self.is_debug
         )
         self.rcs660s.send_command_frame()
